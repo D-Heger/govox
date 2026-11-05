@@ -3,36 +3,47 @@
 
 package block
 
-import (
-	rl "github.com/gen2brain/raylib-go/raylib"
+const (
+	FaceNorth = iota // z-
+	FaceSouth        // z+
+	FaceEast         // x+
+	FaceWest         // x-
+	FaceUp           // y+
+	FaceDown         // y-
 )
 
-const tileSize = 16
+// TileID
+const (
+	TileDirt      int8 = 0
+	TileGrassSide int8 = 1
+	TileGrassTop  int8 = 2
+	TileStone     int8 = 3
+)
 
-type Block struct {
-	Model   rl.Model
-	Texture rl.Texture2D
+// BlockID
+const (
+	Air   int8 = -1
+	Dirt  int8 = 0
+	Grass int8 = 1
+	Stone int8 = 2
+)
+
+// Maps each BlockID to its TileID per Face, in the order of the face enum
+var blockFaces = map[int8][6]int8{
+	Dirt: {
+		TileDirt, TileDirt, TileDirt, TileDirt, TileDirt, TileDirt,
+	},
+	Grass: {
+		TileGrassSide, TileGrassSide, TileGrassSide, TileGrassSide, TileGrassTop, TileDirt,
+	},
+	Stone: {
+		TileStone, TileStone, TileStone, TileStone, TileStone, TileStone,
+	},
 }
 
-func Create() Block {
-	var model = rl.LoadModelFromMesh(rl.GenMeshCube(1.0, 1.0, 1.0))
-
-	var atlas = rl.LoadImage("assets/atlas.png")
-	defer rl.UnloadImage(atlas)
-
-	var rect = rl.Rectangle{X: 0, Y: 0, Width: tileSize, Height: tileSize}
-	var crop = rl.ImageFromImage(*atlas, rect)
-	rl.ImageFlipVertical(&crop)
-	defer rl.UnloadImage(&crop)
-
-	var texture = rl.LoadTextureFromImage(&crop)
-	rl.SetTextureFilter(texture, rl.FilterPoint)
-	rl.SetMaterialTexture(&model.GetMaterials()[0], rl.MapDiffuse, texture)
-
-	return Block{Model: model, Texture: texture}
-}
-
-func (b *Block) Unload() {
-	rl.UnloadTexture(b.Texture)
-	rl.UnloadModel(b.Model)
+func GetTileForFace(blockID int8, face int) int8 {
+	if tiles, ok := blockFaces[blockID]; ok {
+		return tiles[face]
+	}
+	return TileDirt
 }

@@ -4,9 +4,9 @@
 package game
 
 import (
-	"github.com/D-Heger/govox/internal/block"
 	"github.com/D-Heger/govox/internal/controller"
 	"github.com/D-Heger/govox/internal/window"
+	"github.com/D-Heger/govox/internal/world"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -15,12 +15,13 @@ func Run(width, height int32, title string) {
 	defer window.Close()
 
 	camera := controller.CreateCamera()
-	model := block.Create()
-	defer model.Unload()
+
+	gameWorld := world.Create()
+	defer gameWorld.Unload()
 
 	for !window.ShouldClose() {
 		update(&camera)
-		draw(camera, model.Model)
+		draw(camera, &gameWorld)
 	}
 }
 
@@ -28,7 +29,7 @@ func update(camera *rl.Camera3D) {
 	rl.UpdateCameraPro(camera, controller.GetMovement(), controller.GetRotation(), 0.0)
 }
 
-func draw(camera rl.Camera3D, model rl.Model) {
+func draw(camera rl.Camera3D, gameWorld *world.World) {
 	rl.BeginDrawing()
 	defer rl.EndDrawing()
 
@@ -37,6 +38,5 @@ func draw(camera rl.Camera3D, model rl.Model) {
 	rl.BeginMode3D(camera)
 	defer rl.EndMode3D()
 
-	rl.DrawGrid(10, 1.0)
-	rl.DrawModel(model, rl.Vector3{X: 0.5, Y: 0.5, Z: 0.5}, 1.0, rl.White)
+	gameWorld.Draw()
 }

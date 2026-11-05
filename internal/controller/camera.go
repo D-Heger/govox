@@ -6,8 +6,8 @@ package controller
 import rl "github.com/gen2brain/raylib-go/raylib"
 
 func CreateCamera() rl.Camera3D {
-	var position = rl.Vector3{X: 0.0, Y: 3.0, Z: 3.0}
-	var target = rl.Vector3{X: 0.0, Y: 0.0, Z: 0.0}
+	var position = rl.Vector3{X: 24.0, Y: 18.0, Z: 24.0}
+	var target = rl.Vector3{X: 8.0, Y: 6.0, Z: 8.0}
 	var up = rl.Vector3{X: 0.0, Y: 1.0, Z: 0.0}
 	var fovY float32 = 65
 	return rl.NewCamera3D(position, target, up, fovY, rl.CameraPerspective)
