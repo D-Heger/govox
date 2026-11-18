@@ -11,6 +11,7 @@ type Atlas struct {
 	Texture rl.Texture2D
 }
 
+// LoadAtlas loads a texture atlas from the given path and returns an Atlas struct.
 func LoadAtlas(path string) Atlas {
 	image := rl.LoadImage(path)
 	defer rl.UnloadImage(image)
@@ -21,15 +22,15 @@ func LoadAtlas(path string) Atlas {
 	return Atlas{Texture: texture}
 }
 
-// Returns [4]float32{uMin, vMin, uMax, vMax} for a given index tile
-func (a Atlas) GetUV(blockID int8) [4]float32 {
+// GetUV returns [4]float32{uMin, vMin, uMax, vMax} for a given index tile.
+func (a Atlas) GetUV(tileId TileID) [4]float32 {
 	columns := int(a.Texture.Width) / tileSize
 	if columns == 0 {
 		return [4]float32{0, 0, 1, 1}
 	}
 
-	tileX := int(blockID) % columns
-	tileY := int(blockID) / columns
+	tileX := int(tileId) % columns
+	tileY := int(tileId) / columns
 
 	uMin := float32(tileX*tileSize) / float32(a.Texture.Width)
 	vMin := float32(tileY*tileSize) / float32(a.Texture.Height)
@@ -39,6 +40,7 @@ func (a Atlas) GetUV(blockID int8) [4]float32 {
 	return [4]float32{uMin, vMin, uMax, vMax}
 }
 
+// Unload releases the texture associated with the atlas.
 func (a Atlas) Unload() {
 	rl.UnloadTexture(a.Texture)
 }

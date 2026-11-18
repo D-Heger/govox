@@ -6,5 +6,5 @@ package main
 import "github.com/D-Heger/govox/internal/game"
 
 func main() {
-	game.Run(800, 600, "Govox POC")
+	game.Run(1200, 800, "Govox POC")
 }

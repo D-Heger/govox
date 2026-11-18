@@ -5,6 +5,7 @@ package chunk
 
 import (
 	"github.com/D-Heger/govox/internal/block"
+	"github.com/D-Heger/govox/internal/terrain"
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -13,15 +14,52 @@ const (
 	ChunkDepth = 16
 )
 
-// Checks for a solid block at the world coordinate
+// SolidFunc checks for a solid block at the world coordinate
 type SolidFunc func(gx, gy, gz int) bool
 
-type Chunk struct {
-	BlockID  [ChunkSize][ChunkDepth][ChunkSize]int8
-	Model    rl.Model
-	Position rl.Vector3
+// Pos is a chunk coordinate in chunk space.
+type Pos struct {
+	X, Y, Z int
 }
 
+// Blocks is a 3D array of BlockIDs representing the blocks in a chunk.
+type Blocks [ChunkSize][ChunkDepth][ChunkSize]block.BlockID
+
+// Chunk represents a chunk of blocks in the game world.
+type Chunk struct {
+	Pos        Pos
+	BlockID    Blocks
+	solidCount int
+	Model      rl.Model
+	Position   rl.Vector3
+	Dirty      bool
+	Meshed     bool
+}
+
+// PosAt returns the chunk containing the given block coordinate.
+func PosAt(gx, gy, gz int) Pos {
+	return Pos{X: floorDiv(gx, ChunkSize), Y: floorDiv(gy, ChunkDepth), Z: floorDiv(gz, ChunkSize)}
+}
+
+// floorDiv performs integer division that rounds towards negative infinity, useful for chunk coordinate calculations.
+func floorDiv(a, b int) int {
+	q := a / b
+	if a%b != 0 && a < 0 {
+		q--
+	}
+	return q
+}
+
+// origin returns the world-space origin of the chunk based on its chunk coordinates.
+func (p Pos) origin() rl.Vector3 {
+	return rl.Vector3{
+		X: float32(p.X * ChunkSize),
+		Y: float32(p.Y * ChunkDepth),
+		Z: float32(p.Z * ChunkSize),
+	}
+}
+
+// faceDev holds the data for a single face of a cube, including its neighbor offset, normal, brightness, vertices, and UV mapping.
 type faceDev struct {
 	neighborOffset [3]int //dx, dy, dz
 	faceNormal     rl.Vector3
@@ -30,6 +68,7 @@ type faceDev struct {
 	uvIndex        [6][2]int // 0=uMin, 1=vMin, 2=uMax, 3=vMax
 }
 
+// cubeFaces defines the six faces of a cube, each with its neighbor offset, normal vector, brightness, vertex positions, and UV mapping indices.
 var cubeFaces = [6]faceDev{
 	// North z-
 	{
@@ -69,63 +108,83 @@ var cubeFaces = [6]faceDev{
 	},
 }
 
-func Create(position rl.Vector3) Chunk {
-	chunk := Chunk{Position: position}
-	chunk.generate()
+// Create generates a new chunk at the given position using the provided terrain generator.
+func Create(pos Pos, gen *terrain.Generator) *Chunk {
+	chunk := &Chunk{Pos: pos, Position: pos.origin()}
+	chunk.generate(gen)
 	return chunk
 }
 
+// FromBlocks wraps already-loaded block data (e.g. from disk).
+func FromBlocks(pos Pos, blocks Blocks) *Chunk {
+	chunk := &Chunk{Pos: pos, Position: pos.origin(), BlockID: blocks}
+	for x := range ChunkSize {
+		for y := range ChunkDepth {
+			for z := range ChunkSize {
+				if blocks[x][y][z] != block.Air {
+					chunk.solidCount++
+				}
+			}
+		}
+	}
+	return chunk
+}
+
+// BuildMesh generates the mesh for the chunk based on its block data and the provided texture atlas. It uses the worldIsSolid function to determine if neighboring blocks are solid.
 func (chunk *Chunk) BuildMesh(atlas block.Atlas, worldIsSolid SolidFunc) {
+	chunk.Meshed = true
+	if chunk.solidCount == 0 {
+		return
+	}
+
 	mesh := chunk.createMesh(atlas, worldIsSolid)
+	if mesh.VertexCount == 0 {
+		return
+	}
+
 	chunk.Model = rl.LoadModelFromMesh(mesh)
 	rl.SetMaterialTexture(&chunk.Model.GetMaterials()[0], rl.MapDiffuse, atlas.Texture)
 }
 
+// Draw renders the chunk's model at its world position.
 func (chunk *Chunk) Draw() {
+	if chunk.Model.MeshCount == 0 {
+		return
+	}
 	rl.DrawModel(chunk.Model, chunk.Position, 1.0, rl.White)
 }
 
+// Unload releases the resources associated with the chunk's model.
 func (chunk *Chunk) Unload() {
+	chunk.Meshed = false
+	if chunk.Model.MeshCount == 0 {
+		return
+	}
 	rl.UnloadModel(chunk.Model)
+	chunk.Model = rl.Model{}
 }
 
-func (chunk *Chunk) generate() {
-	for y := range ChunkDepth {
-		var b int8 = block.Stone
-		if y > 10 {
-			b = block.Air
-		}
-		if y == 10 {
-			b = block.Grass
-		}
-		if y <= 9 && y >= 7 {
-			b = block.Dirt
-		}
-
-		for x := range ChunkSize {
-			for z := range ChunkSize {
-				chunk.BlockID[x][y][z] = b
-			}
-		}
-	}
-
-	// Random Holes
-	//for range 600 {
-	//	chunk.BlockID[rand.Intn(ChunkSize)][rand.Intn(11)][rand.Intn(ChunkSize)] = block.Air
-	//}
+// generate populates the chunk's block data using the provided terrain generator.
+func (chunk *Chunk) generate(gen *terrain.Generator) {
+	baseX := chunk.Pos.X * ChunkSize
+	baseY := chunk.Pos.Y * ChunkDepth
+	baseZ := chunk.Pos.Z * ChunkSize
 
 	for x := range ChunkSize {
-		for y := range ChunkDepth {
-			for z := range ChunkSize {
-				if chunk.BlockID[x][y][z] == block.Dirt && !chunk.IsSolidLocal(x, y+1, z) {
-					chunk.BlockID[x][y][z] = block.Grass
+		for z := range ChunkSize {
+			surface := gen.SurfaceAt(baseX+x, baseZ+z)
+			for y := range ChunkDepth {
+				b := gen.BlockAt(baseY+y, surface)
+				chunk.BlockID[x][y][z] = b
+				if b != block.Air {
+					chunk.solidCount++
 				}
 			}
 		}
 	}
 }
 
-// chunk-cords lookup
+// IsSolidLocal checks if the block at the given chunk-space coordinates (x, y, z) is solid (not Air). It returns false if the coordinates are out of bounds.
 func (c *Chunk) IsSolidLocal(x, y, z int) bool {
 	if x < 0 || x >= ChunkSize || y < 0 || y >= ChunkDepth || z < 0 || z >= ChunkSize {
 		return false
@@ -133,22 +192,25 @@ func (c *Chunk) IsSolidLocal(x, y, z int) bool {
 	return c.BlockID[x][y][z] != block.Air
 }
 
-// Checks local first, then world
+// isSolid checks if the block at the given chunk-space coordinates (x, y, z) is solid (not Air). If the coordinates are out of bounds, it uses the provided worldIsSolid function to check neighboring chunks.
 func (chunk *Chunk) isSolid(x, y, z int, worldIsSolid SolidFunc) bool {
-	if y < 0 || y >= ChunkDepth {
-		return false
+	if x >= 0 && x < ChunkSize &&
+		y >= 0 && y < ChunkDepth &&
+		z >= 0 && z < ChunkSize {
+		return chunk.BlockID[x][y][z] != block.Air
 	}
-	if x < 0 || x >= ChunkSize || z < 0 || z >= ChunkSize {
-		if worldIsSolid != nil {
-			gx := int(chunk.Position.X) + x
-			gz := int(chunk.Position.Z) + z
-			return worldIsSolid(gx, y, gz)
-		}
-		return false
+
+	if worldIsSolid != nil {
+		gx := int(chunk.Position.X) + x
+		gy := int(chunk.Position.Y) + y
+		gz := int(chunk.Position.Z) + z
+		return worldIsSolid(gx, gy, gz)
 	}
-	return chunk.BlockID[x][y][z] != block.Air
+
+	return false
 }
 
+// createMesh generates the mesh for the chunk based on its block data and the provided texture atlas. It uses the worldIsSolid function to determine if neighboring blocks are solid.
 func (chunk *Chunk) createMesh(atlas block.Atlas, worldIsSolid SolidFunc) rl.Mesh {
 	var vertices []float32
 	var normals []float32
@@ -196,14 +258,14 @@ func (chunk *Chunk) createMesh(atlas block.Atlas, worldIsSolid SolidFunc) rl.Mes
 		mesh.Normals = &normals[0]
 		mesh.Texcoords = &texcoords[0]
 		mesh.Colors = &colors[0]
+
+		rl.UploadMesh(&mesh, false)
+
+		mesh.Vertices = nil
+		mesh.Normals = nil
+		mesh.Texcoords = nil
+		mesh.Colors = nil
 	}
-
-	rl.UploadMesh(&mesh, false)
-
-	mesh.Vertices = nil
-	mesh.Normals = nil
-	mesh.Texcoords = nil
-	mesh.Colors = nil
 
 	return mesh
 }

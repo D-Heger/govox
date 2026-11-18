@@ -3,33 +3,43 @@
 
 package block
 
+type Face byte
+
 const (
-	FaceNorth = iota // z-
-	FaceSouth        // z+
-	FaceEast         // x+
-	FaceWest         // x-
-	FaceUp           // y+
-	FaceDown         // y-
+	FaceNorth Face = iota // z-
+	FaceSouth             // z+
+	FaceEast              // x+
+	FaceWest              // x-
+	FaceUp                // y+
+	FaceDown              // y-
 )
 
-// TileID
+// TileID represents the ID of a tile (16x16 pixel area, left-to-right, top-to-bottom) in the texture atlas.
+type TileID int8
+
+// Tile constants for the texture atlas. These IDs correspond to the order of tiles in the atlas image.
 const (
-	TileDirt      int8 = 0
-	TileGrassSide int8 = 1
-	TileGrassTop  int8 = 2
-	TileStone     int8 = 3
+	TileDirt      TileID = 0
+	TileGrassSide TileID = 1
+	TileGrassTop  TileID = 2
+	TileStone     TileID = 3
+	TileDiabase   TileID = 4
 )
 
-// BlockID
+// BlockID represents the ID of a block type in the game world.
+type BlockID int8
+
+// Block constants representing different types of blocks in the game world.
 const (
-	Air   int8 = -1
-	Dirt  int8 = 0
-	Grass int8 = 1
-	Stone int8 = 2
+	Air     BlockID = -1
+	Dirt    BlockID = 0
+	Grass   BlockID = 1
+	Stone   BlockID = 2
+	Diabase BlockID = 3
 )
 
-// Maps each BlockID to its TileID per Face, in the order of the face enum
-var blockFaces = map[int8][6]int8{
+// blockFaces maps each BlockID to its TileID per Face, in the order of the face enum
+var blockFaces = map[BlockID][6]TileID{
 	Dirt: {
 		TileDirt, TileDirt, TileDirt, TileDirt, TileDirt, TileDirt,
 	},
@@ -39,11 +49,16 @@ var blockFaces = map[int8][6]int8{
 	Stone: {
 		TileStone, TileStone, TileStone, TileStone, TileStone, TileStone,
 	},
+	Diabase: {
+		TileDiabase, TileDiabase, TileDiabase, TileDiabase, TileDiabase, TileDiabase,
+	},
 }
 
-func GetTileForFace(blockID int8, face int) int8 {
-	if tiles, ok := blockFaces[blockID]; ok {
-		return tiles[face]
+// GetTileForFace returns the TileID for a given BlockID and face index (0-5).
+func GetTileForFace(blockID BlockID, face int) TileID {
+	tiles, ok := blockFaces[blockID]
+	if !ok || face < 0 || face >= len(tiles) {
+		return TileDirt
 	}
-	return TileDirt
+	return tiles[face]
 }

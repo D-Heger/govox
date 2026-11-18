@@ -10,6 +10,7 @@ import (
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
+// Run initializes the game window, sets up the camera and game world, and enters the main game loop. It handles input, updates the camera, streams chunks based on the camera's position, and renders the scene until the window is closed.
 func Run(width, height int32, title string) {
 	window.InitWindow(width, height, title)
 	defer window.Close()
@@ -21,14 +22,17 @@ func Run(width, height int32, title string) {
 
 	for !window.ShouldClose() {
 		update(&camera)
-		draw(camera, &gameWorld)
+		gameWorld.Stream(camera.Position)
+		draw(camera, gameWorld)
 	}
 }
 
+// update loop
 func update(camera *rl.Camera3D) {
 	rl.UpdateCameraPro(camera, controller.GetMovement(), controller.GetRotation(), 0.0)
 }
 
+// draw loop
 func draw(camera rl.Camera3D, gameWorld *world.World) {
 	rl.BeginDrawing()
 	defer rl.EndDrawing()

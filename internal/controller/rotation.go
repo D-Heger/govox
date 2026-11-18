@@ -9,6 +9,7 @@ import (
 
 const rotationSpeed = 0.05
 
+// GetRotation calculates and returns the rotation vector based on the current mouse movement. It scales the mouse delta by a predefined rotation speed to determine the rotation in the X and Y axes, while the Z axis remains unchanged.
 func GetRotation() rl.Vector3 {
 	mouseDelta := rl.GetMouseDelta()
 	return rl.Vector3{X: mouseDelta.X * rotationSpeed, Y: mouseDelta.Y * rotationSpeed, Z: 0.0}
